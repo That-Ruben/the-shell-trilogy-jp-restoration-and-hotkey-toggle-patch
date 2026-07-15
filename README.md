@@ -50,8 +50,11 @@ produce byte-identical patches.
 ### How it works (short version)
 
 The Japanese text needs no restoring — it is already complete in every
-script file. The patch therefore contains no script data at all, just the
-handful of system files that expose the language:
+script file. Parts 1 and 3 therefore contain no script data at all, just
+the handful of system files that expose the language. Part 2's Japanese
+text kept some stray `＄` markers from the original engine (the localizers
+had deleted them from the other languages), so its patch also includes the
+23 affected scripts with the markers removed.
 
 - `build_all.py` — layers the game's pfs archives the way the engine does
   (last archive wins), adds the 日本語 button to the config language panel,
