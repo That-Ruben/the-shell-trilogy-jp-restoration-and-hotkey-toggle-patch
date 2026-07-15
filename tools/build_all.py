@@ -142,6 +142,35 @@ def patch_lang_lua(text):
     return text + TOGGLE_FUNC
 
 
+def clean_ja_scripts(effective):
+    """Strip leftover ＄ markers from the Japanese text.
+
+    Part 2's ja strings retain string-initial full-width dollar signs
+    (usually followed by a full-width space) from the original
+    pre-remaster engine; the localizers deleted them from en/cn/tw but
+    the untouched ja text still has them, and Artemis renders them
+    literally.  They appear only in ja subtrees and only right after a
+    string's opening quote (verified across all three games), so a plain
+    byte replace is exact.  Games without them (parts 1 and 3) ship no
+    script files at all."""
+    marker = "＄".encode("utf-8")
+    ms = '"＄　'.encode("utf-8")
+    m = '"＄'.encode("utf-8")
+    cleaned = []
+    for key in sorted(effective):
+        if not (key.startswith("script\\") and key.endswith(".ast")):
+            continue
+        an, a, e = effective[key]
+        data = a.read(e)
+        if marker not in data:
+            continue
+        fixed = data.replace(ms, b'"').replace(m, b'"')
+        if marker in fixed:
+            raise SystemExit(f"{e.name}: unexpected non-string-initial ＄")
+        cleaned.append((e.name, fixed))
+    return cleaned
+
+
 def find_archives(game_dir):
     """The game's base .pfs plus its numbered patches, in load order,
     excluding this patch's own output suffix."""
@@ -206,6 +235,12 @@ def main(game_dir, out_pfs=None):
     out.append(("system\\adv\\func.lua",
                 patch_func_lua(text.decode("utf-8")).encode("utf-8")))
 
+    # 3c. scripts with leftover ＄ markers in the ja text (part 2)
+    cleaned = clean_ja_scripts(effective)
+    if cleaned:
+        print(f"cleaning ＄ markers from {len(cleaned)} scripts")
+        out.extend(cleaned)
+
     # 4. config background art: 日本語 row + L-key hint
     import tempfile
     with tempfile.TemporaryDirectory() as tmp:
@@ -257,6 +292,9 @@ def main(game_dir, out_pfs=None):
     assert b"Japanese restoration patch" in got["system\\adv\\func.lua"]
     assert got["system\\table\\list_windows_en.tbl"].count(b'name="bt_lang"') >= 2
     assert got["pc\\en\\mw\\mwlang.png"] == sprite
+    for n, _ in out:
+        if n.lower().startswith("script\\"):
+            assert "＄".encode("utf-8") not in got[n], n
     print("read-back verification OK")
 
 
