@@ -119,6 +119,16 @@ def patch_main_tbl(text):
              '\t\t\tCLICK = "adv_click",')
 
 
+def patch_staff(text):
+    """Staff roll text images exist only for en/cn/tw; the ja entry points
+    at the empty staff/ root, so in Japanese the credits played as music
+    over a black screen. Use the English credit images instead."""
+    text, n = re.subn(r'(staff=\{\s*ja=)""', r'\1"en/"', text)
+    if n != 1:
+        raise SystemExit(f"list_windows.tbl: staff path entry found {n}x")
+    return text
+
+
 def patch_func_lua(text):
     """Mark the patch in the window title (func.lua uses LF endings)."""
     old = '\t\tif init.game_ver == "on" and v then tx = tx.." - Ver"..v end'
@@ -220,10 +230,11 @@ def main(game_dir, out_pfs=None):
         text = patch_adv_groups(text, tbl)
         out.append((tbl, text.encode("utf-8")))
 
-    # 2. main tbl: L-key binding
+    # 2. main tbl: L-key binding, ja staff roll images
     text = read("system\\table\\list_windows.tbl")
     out.append(("system\\table\\list_windows.tbl",
-                patch_main_tbl(text.decode("utf-8")).encode("utf-8")))
+                patch_staff(patch_main_tbl(text.decode("utf-8")))
+                .encode("utf-8")))
 
     # 3. lang.lua: ui-language guard + toggle function
     text = read("system\\msg\\lang.lua")
@@ -288,6 +299,8 @@ def main(game_dir, out_pfs=None):
     assert (b'[76]={btn="L",adv="LANG"}' in got["system\\table\\list_windows.tbl"]
             or b'[76] = { btn="L", adv="LANG" }'
             in got["system\\table\\list_windows.tbl"])
+    assert re.search(rb'staff=\{\s*ja="en/"',
+                     got["system\\table\\list_windows.tbl"])
     assert b"lang_toggle_jaen" in got["system\\msg\\lang.lua"]
     assert b"Japanese restoration patch" in got["system\\adv\\func.lua"]
     assert got["system\\table\\list_windows_en.tbl"].count(b'name="bt_lang"') >= 2
